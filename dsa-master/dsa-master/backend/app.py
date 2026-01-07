@@ -105,23 +105,6 @@ def _favorites_write(data):
         json.dump(data, f, indent=2)
     os.replace(tmp, favorites_file)
 
-def _config_init_file():
-    if not os.path.exists(config_file):
-        os.makedirs(os.path.dirname(config_file), exist_ok=True)
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump({"admin_theme": "default"}, f, indent=2)
-
-def _config_read():
-    _config_init_file()
-    return _read_json_file(config_file, {"admin_theme": "default"})
-
-def _config_write(data):
-    os.makedirs(os.path.dirname(config_file), exist_ok=True)
-    tmp = config_file + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, config_file)
-
 def _travel_history_init_file():
     if not os.path.exists(travel_history_file):
         os.makedirs(os.path.dirname(travel_history_file), exist_ok=True)
