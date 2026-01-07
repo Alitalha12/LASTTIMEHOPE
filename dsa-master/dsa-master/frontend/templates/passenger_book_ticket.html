@@ -899,6 +899,20 @@
                 renderTicketPreview();
             }
         }
+
+        function goToConfirm() {
+            if (!selectedBus) {
+                showError('Please select a bus before continuing.');
+                return;
+            }
+
+            if (!selectedSeat) {
+                showError('Please select a seat before continuing.');
+                return;
+            }
+
+            goToStep(4);
+        }
         
         function renderSeats() {
             const container = document.getElementById('seatsContainer');

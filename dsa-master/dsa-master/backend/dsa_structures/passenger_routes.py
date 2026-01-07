@@ -408,6 +408,8 @@ class PassengerBookingSystem:
         
         # Load data
         self.buses = self._load_json(buses_file)
+        if isinstance(self.buses, list):
+            self.buses = {'buses': self.buses}
         self.routes = self._load_json(routes_file)
         
         # Ticket counter

@@ -507,6 +507,35 @@
             color: #0f766e;
         }
 
+        .ticket-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .ticket-status.confirmed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .ticket-status.open {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .ticket-status.cancelled {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
         .ticket-meta {
             font-size: 0.9rem;
             color: #475569;
@@ -613,62 +642,51 @@
 
             <div class="tickets-layout">
                 <div class="map-card">
-                    <h3>Select Stops on the Map</h3>
-                    <div class="map-container" id="mapContainer">
-                        <svg class="map-lines" id="mapLines"></svg>
-                        <div class="map-toast" id="mapToast">Shortest route highlighted ✨</div>
-                    </div>
-                    <div class="map-legend">
-                        <span><span class="legend-dot" style="background:#334155"></span>Stop</span>
-                        <span><span class="legend-dot" style="background:#22c55e"></span>Start</span>
-                        <span><span class="legend-dot" style="background:#f97316"></span>End</span>
-                        <span><span class="legend-dot" style="background:#2563eb"></span>Shortest Path</span>
-                        <span><span class="legend-dot" style="background:#22c55e"></span>Low Traffic</span>
-                        <span><span class="legend-dot" style="background:#f59e0b"></span>Medium Traffic</span>
-                        <span><span class="legend-dot" style="background:#ef4444"></span>High Traffic</span>
-                    </div>
+                    <h3>Book a Ticket</h3>
 
                     <div class="ticket-form">
                         <div class="field">
-                            <div class="label">Selected Start Stop</div>
-                            <div id="selectedStart">Select a start stop</div>
+                            <div class="label">From Stop</div>
+                            <select id="fromStop" class="bus-select">
+                                <option value="">Select a stop</option>
+                            </select>
                         </div>
                         <div class="field">
-                            <div class="label">Selected End Stop</div>
-                            <div id="selectedEnd">Select an end stop</div>
+                            <div class="label">To Stop</div>
+                            <select id="toStop" class="bus-select">
+                                <option value="">Select a stop</option>
+                            </select>
                         </div>
                         <div class="field">
-                            <div class="label">Route Overview</div>
-                            <div id="routeOverview">Waiting for selections</div>
+                            <div class="label">Shortest Route Summary</div>
+                            <div id="routeSummary">Select stops to calculate the shortest route.</div>
                         </div>
                         <div class="field">
-                            <div class="label">Computed Route</div>
-                            <div id="selectedRoute">Waiting for selections</div>
+                            <div class="label">Route Path</div>
+                            <div id="routePath">Route path will appear here.</div>
                         </div>
                         <div class="field">
-                            <div class="label">Selected Bus</div>
+                            <div class="label">Select Bus</div>
                             <select id="busSelect" class="bus-select">
                                 <option value="">Select a bus</option>
                             </select>
-                            <div class="bus-meta" id="busMeta">Arrival time will show here.</div>
+                            <div class="bus-meta" id="busMeta">Select a route to see buses.</div>
                         </div>
                         <div class="field">
                             <div class="label">Estimated Fare</div>
-                            <div id="estimatedFare">Select stops to calculate fare</div>
+                            <div id="estimatedFare">Select a bus to calculate fare.</div>
                         </div>
                         <div class="ticket-actions">
+                            <button class="btn btn-secondary" id="findRouteBtn">
+                                <i class="fas fa-route"></i> Find Shortest Route
+                            </button>
                             <button class="btn btn-primary" id="createTicketBtn" disabled>
-                                <i class="fas fa-ticket-alt"></i> Create Ticket
+                                <i class="fas fa-ticket-alt"></i> Purchase Ticket
                             </button>
                             <button class="btn btn-secondary" id="resetSelectionBtn">
                                 <i class="fas fa-undo"></i> Reset Selection
                             </button>
                         </div>
-                    </div>
-
-                    <div class="routes-panel">
-                        <h4>Available Routes</h4>
-                        <div class="routes-list" id="routesList"></div>
                     </div>
                 </div>
 
@@ -681,37 +699,25 @@
     </div>
 
     <script>
-        const mapContainer = document.getElementById('mapContainer');
-        const selectedStart = document.getElementById('selectedStart');
-        const selectedEnd = document.getElementById('selectedEnd');
-        const routeOverview = document.getElementById('routeOverview');
-        const selectedRoute = document.getElementById('selectedRoute');
+        const fromStopSelect = document.getElementById('fromStop');
+        const toStopSelect = document.getElementById('toStop');
+        const routeSummary = document.getElementById('routeSummary');
+        const routePath = document.getElementById('routePath');
         const busSelect = document.getElementById('busSelect');
         const busMeta = document.getElementById('busMeta');
         const estimatedFare = document.getElementById('estimatedFare');
-        const mapLines = document.getElementById('mapLines');
-        const mapToast = document.getElementById('mapToast');
+        const findRouteBtn = document.getElementById('findRouteBtn');
         const createTicketBtn = document.getElementById('createTicketBtn');
         const resetSelectionBtn = document.getElementById('resetSelectionBtn');
         const ticketsList = document.getElementById('ticketsList');
-        const routesList = document.getElementById('routesList');
         const logoutButton = document.getElementById('logoutButton');
 
         let stops = [];
-        let edges = [];
-        let routeBusCounts = {};
-        let routeNameCounts = {};
-        let markers = [];
-        let stopPositions = new Map();
-        let startStop = null;
-        let endStop = null;
+        let buses = [];
         let currentDistance = null;
         let activeRouteId = null;
         let activeRouteName = null;
         let activeTraffic = null;
-        let activeBusCount = 0;
-        let activeSegments = [];
-        let buses = [];
 
         function confirmLogout() {
             if (confirm('Are you sure you want to logout?')) {
@@ -721,481 +727,60 @@
 
         logoutButton.addEventListener('click', confirmLogout);
 
-        resetSelectionBtn.addEventListener('click', () => {
-            startStop = null;
-            endStop = null;
-            currentDistance = null;
-            activeRouteId = null;
-            activeRouteName = null;
-            activeTraffic = null;
-            activeBusCount = 0;
-            activeSegments = [];
-            busSelect.value = '';
-            updateSelectionUI();
-            routeOverview.textContent = 'Waiting for selections';
-            selectedRoute.textContent = 'Waiting for selections';
-            estimatedFare.textContent = 'Select stops to calculate fare';
-            updateMarkers();
-            renderEdges();
-            updateAvailableBuses();
-        });
-
-        createTicketBtn.addEventListener('click', () => {
-            if (!startStop || !endStop || !busSelect.value) {
-                return;
-            }
-            createTicketBtn.disabled = true;
-            fetch('/api/passenger/tickets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    start_stop: startStop,
-                    end_stop: endStop,
-                    bus_number: busSelect.value
-                })
-            })
-            .then(response => response.json().then(data => ({ ok: response.ok, data })))
-            .then(({ ok, data }) => {
-                if (!ok) {
-                    throw new Error(data.error || 'Unable to create ticket');
-                }
-                startStop = null;
-                endStop = null;
-                currentDistance = null;
-                activeRouteId = null;
-                activeRouteName = null;
-                activeTraffic = null;
-                activeBusCount = 0;
-                activeSegments = [];
-                updateSelectionUI();
-                routeOverview.textContent = 'Ticket created successfully.';
-                selectedRoute.textContent = 'Ticket created successfully.';
-                estimatedFare.textContent = 'Select stops to calculate fare';
-                loadTickets();
-                updateMarkers();
-                renderEdges();
-            })
-            .catch(error => {
-                selectedRoute.textContent = error.message;
-            })
-            .finally(() => {
-                createTicketBtn.disabled = !(startStop && endStop && busSelect.value);
-            });
-        });
-
-        function updateSelectionUI() {
-            selectedStart.textContent = startStop || 'Select a start stop';
-            selectedEnd.textContent = endStop || 'Select an end stop';
-            createTicketBtn.disabled = !(startStop && endStop && busSelect.value);
+        function init() {
+            loadStops();
+            loadBuses();
+            loadTickets();
         }
 
-        function updateMarkers() {
-            markers.forEach(marker => {
-                marker.classList.remove('selected-start', 'selected-end');
-                if (marker.dataset.stop === startStop) {
-                    marker.classList.add('selected-start');
-                }
-                if (marker.dataset.stop === endStop) {
-                    marker.classList.add('selected-end');
-                }
-            });
-        }
-
-        function selectStop(stopName) {
-            if (!startStop || (startStop && endStop)) {
-                startStop = stopName;
-                endStop = null;
-            } else if (startStop && !endStop && stopName !== startStop) {
-                endStop = stopName;
-            }
-            updateSelectionUI();
-            updateMarkers();
-            if (startStop && endStop) {
-                fetchRoute();
-            } else {
-                selectedRoute.textContent = 'Waiting for selections';
-                routeOverview.textContent = 'Waiting for selections';
-            }
-        }
-
-        function fetchStops() {
+        function loadStops() {
             fetch('/api/passenger/graph')
                 .then(response => response.json())
                 .then(data => {
                     stops = data.stops || [];
-                    edges = data.edges || [];
-                    routeBusCounts = data.route_bus_counts || {};
-                    routeNameCounts = data.route_name_counts || {};
-                    renderMap();
+                    const options = stops.map(stop => `<option value="${stop.name}">${stop.name}</option>`).join('');
+                    fromStopSelect.innerHTML = `<option value="">Select a stop</option>${options}`;
+                    toStopSelect.innerHTML = `<option value="">Select a stop</option>${options}`;
                 })
                 .catch(() => {
-                    mapContainer.textContent = 'Unable to load stops.';
+                    fromStopSelect.innerHTML = '<option value="">No stops available</option>';
+                    toStopSelect.innerHTML = '<option value="">No stops available</option>';
                 });
         }
 
-        function scheduleMapRender() {
-            requestAnimationFrame(() => {
-                renderMap();
-            });
+        function loadBuses() {
+            fetch('/api/passenger/buses')
+                .then(response => response.json())
+                .then(data => {
+                    buses = data.buses || [];
+                    updateAvailableBuses();
+                })
+                .catch(() => {
+                    buses = [];
+                    updateAvailableBuses();
+                });
         }
 
-        function renderMap() {
-            mapContainer.querySelectorAll('.map-marker').forEach(marker => marker.remove());
-            mapLines.innerHTML = '';
-            markers = [];
-            if (!stops.length) {
-                const message = document.createElement('div');
-                message.textContent = 'No stops available.';
-                message.style.padding = '20px';
-                message.style.color = '#475569';
-                mapContainer.appendChild(message);
+        function computeRoute() {
+            const fromStop = fromStopSelect.value;
+            const toStop = toStopSelect.value;
+
+            if (!fromStop || !toStop) {
+                routeSummary.textContent = 'Please select both stops to calculate route.';
+                return;
+            }
+            if (fromStop === toStop) {
+                routeSummary.textContent = 'From and To stops cannot be the same.';
                 return;
             }
 
-            const rect = mapContainer.getBoundingClientRect();
-            const width = rect.width || mapContainer.clientWidth || 600;
-            const height = rect.height || mapContainer.clientHeight || 400;
-            const padding = 30;
+            routeSummary.textContent = 'Calculating shortest route...';
+            routePath.textContent = 'Please wait...';
 
-            const hasCoords = stops.some(stop => stop.latitude !== null && stop.longitude !== null);
-            let minLat = 0, maxLat = 0, minLng = 0, maxLng = 0;
-            if (hasCoords) {
-                const coords = stops.filter(stop => stop.latitude !== null && stop.longitude !== null);
-                minLat = Math.min(...coords.map(stop => stop.latitude));
-                maxLat = Math.max(...coords.map(stop => stop.latitude));
-                minLng = Math.min(...coords.map(stop => stop.longitude));
-                maxLng = Math.max(...coords.map(stop => stop.longitude));
-            }
-
-            const positions = new Map();
-            stops.forEach((stop, index) => {
-                let x;
-                let y;
-                if (hasCoords && stop.latitude !== null && stop.longitude !== null && maxLat !== minLat && maxLng !== minLng) {
-                    const latRatio = (stop.latitude - minLat) / (maxLat - minLat);
-                    const lngRatio = (stop.longitude - minLng) / (maxLng - minLng);
-                    x = padding + lngRatio * (width - padding * 2);
-                    y = padding + (1 - latRatio) * (height - padding * 2);
-                } else {
-                    const angle = (index / stops.length) * Math.PI * 2;
-                    x = width / 2 + Math.cos(angle) * (width / 2 - padding);
-                    y = height / 2 + Math.sin(angle) * (height / 2 - padding);
-                }
-
-                positions.set(stop.name, { x, y });
-
-                const marker = document.createElement('div');
-                marker.className = 'map-marker';
-                marker.style.left = `${x}px`;
-                marker.style.top = `${y}px`;
-                marker.title = stop.name;
-                marker.dataset.stop = stop.name;
-                const label = document.createElement('span');
-                label.textContent = stop.name;
-                marker.appendChild(label);
-                marker.addEventListener('click', () => selectStop(stop.name));
-                mapContainer.appendChild(marker);
-                markers.push(marker);
-            });
-            stopPositions = positions;
-            renderEdges(stopPositions);
-            updateMarkers();
-        }
-
-        function renderEdges(positions) {
-            const width = mapContainer.clientWidth || 500;
-            const height = mapContainer.clientHeight || 360;
-            const posMap = positions || stopPositions;
-            mapLines.innerHTML = '';
-            mapLines.setAttribute('viewBox', `0 0 ${width} ${height}`);
-            edges.forEach(edge => {
-                const from = posMap.get(edge.from);
-                const to = posMap.get(edge.to);
-                if (!from || !to) {
-                    return;
-                }
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', from.x);
-                line.setAttribute('y1', from.y);
-                line.setAttribute('x2', to.x);
-                line.setAttribute('y2', to.y);
-                line.setAttribute('class', `map-edge traffic-${edge.traffic || 'low'}`);
-                if (isActiveEdge(edge.from, edge.to)) {
-                    line.classList.add('active-route');
-                }
-                mapLines.appendChild(line);
-
-                if (isActiveEdge(edge.from, edge.to)) {
-                    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    label.setAttribute('x', ((from.x + to.x) / 2).toFixed(1));
-                    label.setAttribute('y', ((from.y + to.y) / 2 - 6).toFixed(1));
-                    label.setAttribute('class', 'map-label');
-                    label.textContent = `${edge.weight || edge.distance || 0} km`;
-                    mapLines.appendChild(label);
-                }
-            });
-        }
-
-        function isActiveEdge(from, to) {
-            return activeSegments.some(segment =>
-                (segment.from === from && segment.to === to) ||
-                (segment.from === to && segment.to === from)
-            );
-        }
-
-        function showToast(message) {
-            if (!mapToast) {
-                return;
-            }
-            mapToast.textContent = message;
-            mapToast.classList.add('show');
-            setTimeout(() => mapToast.classList.remove('show'), 2400);
-        }
-
-        function formatTrafficLabel(level) {
-            if (level === 'high') return 'High traffic';
-            if (level === 'medium') return 'Medium traffic';
-            return 'Low traffic';
-        }
-
-        function updateRouteOverview() {
-            if (!activeRouteName) {
-                routeOverview.textContent = 'Waiting for selections';
-                return;
-            }
-            const trafficLabel = formatTrafficLabel(activeTraffic);
-            const busLabel = activeBusCount ? `${activeBusCount} buses allocated` : 'No buses allocated yet';
-            routeOverview.textContent = `${activeRouteName} • ${trafficLabel} • ${busLabel}`;
-        }
-
-        function updateAvailableBuses() {
-            busSelect.innerHTML = '<option value="">Select a bus</option>';
-            const filtered = activeRouteId
-                ? buses.filter(bus => String(bus.route_id || '') === String(activeRouteId))
-                : buses;
-            if (!filtered.length) {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = activeRouteId ? 'No buses allocated to this route' : 'No buses available';
-                option.disabled = true;
-                busSelect.appendChild(option);
-            }
-            filtered.forEach(bus => {
-                const option = document.createElement('option');
-                option.value = bus.bus_number;
-                const isFull = (bus.capacity || 0) && (bus.current_passengers || 0) >= bus.capacity;
-                option.disabled = isFull;
-                option.textContent = `Bus ${bus.bus_number} (${bus.route_name || 'Route'})${isFull ? ' • Full' : ''}`;
-                busSelect.appendChild(option);
-            });
-            if (busSelect.value && !filtered.some(bus => String(bus.bus_number) === busSelect.value)) {
-                busSelect.value = '';
-            }
-            if (!busSelect.value) {
-                busMeta.textContent = 'Arrival time will show here.';
-            }
-            updateSelectionUI();
-            updateFareEstimate();
-        }
-
-        function fareRateForBus(bus) {
-            if (bus && bus.type === 'air_conditioned') {
-                return 3.5;
-            }
-            return 2.5;
-        }
-
-        function updateFareEstimate() {
-            if (!currentDistance) {
-                estimatedFare.textContent = 'Select stops to calculate fare';
-                return;
-            }
-            const bus = buses.find(item => String(item.bus_number) === busSelect.value);
-            if (!bus) {
-                estimatedFare.textContent = 'Select a bus to calculate fare';
-                return;
-            }
-            const rate = fareRateForBus(bus);
-            const fare = Math.max(currentDistance * rate, 10).toFixed(2);
-            estimatedFare.textContent = `Estimated fare: Rs. ${fare}`;
-        }
-
-        function isActiveEdge(from, to) {
-            return activeSegments.some(segment =>
-                (segment.from === from && segment.to === to) ||
-                (segment.from === to && segment.to === from)
-            );
-        }
-
-        function showToast(message) {
-            if (!mapToast) {
-                return;
-            }
-            mapToast.textContent = message;
-            mapToast.classList.add('show');
-            setTimeout(() => mapToast.classList.remove('show'), 2400);
-        }
-
-        function formatTrafficLabel(level) {
-            if (level === 'high') return 'High traffic';
-            if (level === 'medium') return 'Medium traffic';
-            return 'Low traffic';
-        }
-
-        function updateRouteOverview() {
-            if (!activeRouteName) {
-                routeOverview.textContent = 'Waiting for selections';
-                routeSummary.innerHTML = '';
-                return;
-            }
-            const trafficLabel = formatTrafficLabel(activeTraffic);
-            const busLabel = activeBusCount ? `${activeBusCount} buses allocated` : 'No buses allocated yet';
-            routeOverview.textContent = `${activeRouteName} • ${trafficLabel} • ${busLabel}`;
-            routeSummary.innerHTML = `
-                <span class="route-chip">${trafficLabel}</span>
-                <span class="route-chip">${busLabel}</span>
-                <span class="route-chip">${currentDistance ? currentDistance.toFixed(1) : '--'} km</span>
-            `;
-        }
-
-        function updateAvailableBuses() {
-            busSelect.innerHTML = '<option value="">Select a bus</option>';
-            const filtered = activeRouteId
-                ? buses.filter(bus => String(bus.route_id || '') === String(activeRouteId))
-                : activeRouteFilter
-                    ? buses.filter(bus => (bus.route_name || '') === activeRouteFilter)
-                    : buses;
-            if (!filtered.length) {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = activeRouteId ? 'No buses allocated to this route' : 'No buses available';
-                option.disabled = true;
-                busSelect.appendChild(option);
-            }
-            filtered.forEach(bus => {
-                const option = document.createElement('option');
-                option.value = bus.bus_number;
-                const isFull = (bus.capacity || 0) && (bus.current_passengers || 0) >= bus.capacity;
-                option.disabled = isFull;
-                option.textContent = `Bus ${bus.bus_number} (${bus.route_name || 'Route'})${isFull ? ' • Full' : ''}`;
-                busSelect.appendChild(option);
-            });
-            if (busSelect.value && !filtered.some(bus => String(bus.bus_number) === busSelect.value)) {
-                busSelect.value = '';
-            }
-            if (!busSelect.value) {
-                busMeta.textContent = 'Arrival time will show here.';
-            }
-            updateSelectionUI();
-            updateFareEstimate();
-        }
-
-        function buildRouteSummaries() {
-            const summaryMap = new Map();
-            edges.forEach(edge => {
-                const name = edge.route_name || 'Route';
-                if (!summaryMap.has(name)) {
-                    summaryMap.set(name, {
-                        name,
-                        distance: 0,
-                        stops: new Set(),
-                        busCount: routeNameCounts[name] || 0,
-                        traffic: edge.traffic || 'low',
-                    });
-                }
-                const summary = summaryMap.get(name);
-                summary.distance += Number(edge.weight || edge.distance || 0);
-                summary.stops.add(edge.from);
-                summary.stops.add(edge.to);
-                if (edge.traffic === 'high') {
-                    summary.traffic = 'high';
-                } else if (edge.traffic === 'medium' && summary.traffic !== 'high') {
-                    summary.traffic = 'medium';
-                }
-            });
-            routeSummaries = Array.from(summaryMap.values()).map(summary => ({
-                ...summary,
-                stops: Array.from(summary.stops),
-            }));
-        }
-
-        function renderRouteOptions() {
-            if (!routeSelect) return;
-            routeSelect.innerHTML = '<option value="">Show all routes</option>';
-            routeSummaries.forEach(summary => {
-                const option = document.createElement('option');
-                option.value = summary.name;
-                option.textContent = `${summary.name} (${summary.stops.length} stops)`;
-                routeSelect.appendChild(option);
-            });
-            updateRouteStops();
-        }
-
-        function updateRouteStops() {
-            if (!routeStops) return;
-            if (!activeRouteFilter) {
-                routeStops.textContent = 'Stops: --';
-                return;
-            }
-            const summary = routeSummaries.find(item => item.name === activeRouteFilter);
-            routeStops.textContent = summary
-                ? `Stops: ${summary.stops.join(' → ')}`
-                : 'Stops: --';
-        }
-
-        function renderRoutesList() {
-            if (!routesList) return;
-            routesList.innerHTML = '';
-            if (!routeSummaries.length) {
-                routesList.innerHTML = '<div class="route-card">No routes available.</div>';
-                return;
-            }
-            routeSummaries.forEach(summary => {
-                const card = document.createElement('div');
-                card.className = 'route-card';
-                card.innerHTML = `
-                    <strong>${summary.name}</strong>
-                    <div class="route-meta">
-                        <span class="route-pill">${summary.stops.length} stops</span>
-                        <span class="route-pill">${summary.distance.toFixed(1)} km</span>
-                        <span class="route-pill">${summary.busCount} buses</span>
-                        <span class="route-pill">${formatTrafficLabel(summary.traffic)}</span>
-                    </div>
-                `;
-                routesList.appendChild(card);
-            });
-        }
-
-        function fareRateForBus(bus) {
-            if (bus && bus.type === 'air_conditioned') {
-                return 3.5;
-            }
-            return 2.5;
-        }
-
-        function updateFareEstimate() {
-            if (!currentDistance) {
-                estimatedFare.textContent = 'Select stops to calculate fare';
-                return;
-            }
-            const bus = buses.find(item => String(item.bus_number) === busSelect.value);
-            if (!bus) {
-                estimatedFare.textContent = 'Select a bus to calculate fare';
-                return;
-            }
-            const rate = fareRateForBus(bus);
-            const fare = Math.max(currentDistance * rate, 10).toFixed(2);
-            estimatedFare.textContent = `Estimated fare: Rs. ${fare}`;
-        }
-
-        function fetchRoute() {
             fetch('/api/passenger/route', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    start_stop: startStop,
-                    end_stop: endStop
-                })
+                body: JSON.stringify({ start_stop: fromStop, end_stop: toStop })
             })
             .then(response => response.json().then(data => ({ ok: response.ok, data })))
             .then(({ ok, data }) => {
@@ -1206,32 +791,135 @@
                 activeRouteId = data.route_id;
                 activeRouteName = data.route_name || 'Route';
                 activeTraffic = data.traffic || 'low';
-                activeBusCount = data.bus_count || 0;
-                activeSegments = data.segments || [];
-                updateRouteOverview();
-                selectedRoute.textContent = `${data.path.join(' → ')} (${data.distance.toFixed(1)} km)`;
-                updateFareEstimate();
-                renderEdges();
+                routeSummary.textContent = `${activeRouteName} • ${activeTraffic} traffic • ${data.distance.toFixed(1)} km`;
+                routePath.textContent = data.path.join(' → ');
                 updateAvailableBuses();
-                showToast('Shortest route highlighted ✨');
+                updateFareEstimate();
+                updateCreateButton();
             })
             .catch(error => {
-                selectedRoute.textContent = error.message;
-                routeOverview.textContent = 'Unable to compute route';
-                estimatedFare.textContent = 'Select stops to calculate fare';
-                activeSegments = [];
-                renderEdges();
+                routeSummary.textContent = error.message;
+                routePath.textContent = 'Route not available.';
+                currentDistance = null;
+                activeRouteId = null;
+                activeRouteName = null;
+                activeTraffic = null;
+                updateAvailableBuses();
+                updateFareEstimate();
+                updateCreateButton();
             });
         }
 
-        function loadBuses() {
-            fetch('/api/passenger/buses')
-                .then(response => response.json())
-                .then(data => {
-                    buses = data.buses || [];
-                    updateAvailableBuses();
-                });
+        function updateAvailableBuses() {
+            busSelect.innerHTML = '<option value="">Select a bus</option>';
+            if (!buses.length) {
+                return;
+            }
+
+            const filtered = activeRouteId
+                ? buses.filter(bus => String(bus.route_id || '') === String(activeRouteId))
+                : activeRouteName
+                    ? buses.filter(bus => (bus.route_name || '') === activeRouteName)
+                    : buses;
+
+            if (!filtered.length) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No buses available for this route';
+                busSelect.appendChild(option);
+                return;
+            }
+
+            filtered.forEach(bus => {
+                const option = document.createElement('option');
+                option.value = bus.bus_number;
+                const isFull = (bus.capacity || 0) && (bus.current_passengers || 0) >= bus.capacity;
+                option.textContent = `Bus ${bus.bus_number} (${bus.route_name || 'Route'})${isFull ? ' • Full' : ''}`;
+                option.disabled = isFull;
+                busSelect.appendChild(option);
+            });
         }
+
+        function fareRateForBus(bus) {
+            if (bus && bus.type === 'air_conditioned') {
+                return 3.5;
+            }
+            return 2.5;
+        }
+
+        function updateFareEstimate() {
+            if (!currentDistance) {
+                estimatedFare.textContent = 'Select a route to calculate fare.';
+                return;
+            }
+            const bus = buses.find(item => String(item.bus_number) === busSelect.value);
+            if (!bus) {
+                estimatedFare.textContent = 'Select a bus to calculate fare.';
+                return;
+            }
+            const rate = fareRateForBus(bus);
+            const fare = Math.max(currentDistance * rate, 10).toFixed(2);
+            estimatedFare.textContent = `Estimated fare: Rs. ${fare}`;
+        }
+
+        function updateCreateButton() {
+            createTicketBtn.disabled = !(fromStopSelect.value && toStopSelect.value && busSelect.value && currentDistance);
+        }
+
+        function resetSelection() {
+            fromStopSelect.value = '';
+            toStopSelect.value = '';
+            busSelect.value = '';
+            currentDistance = null;
+            activeRouteId = null;
+            activeRouteName = null;
+            activeTraffic = null;
+            routeSummary.textContent = 'Select stops to calculate the shortest route.';
+            routePath.textContent = 'Route path will appear here.';
+            busMeta.textContent = 'Select a route to see buses.';
+            updateAvailableBuses();
+            updateFareEstimate();
+            updateCreateButton();
+        }
+
+        function purchaseTicket() {
+            if (createTicketBtn.disabled) {
+                return;
+            }
+            createTicketBtn.disabled = true;
+            fetch('/api/passenger/tickets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    start_stop: fromStopSelect.value,
+                    end_stop: toStopSelect.value,
+                    bus_number: busSelect.value
+                })
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    throw new Error(data.error || 'Unable to create ticket');
+                }
+                routeSummary.textContent = 'Ticket purchased successfully.';
+                routePath.textContent = 'Travel history updated.';
+                loadTickets();
+                resetSelection();
+            })
+            .catch(error => {
+                routeSummary.textContent = error.message;
+            })
+            .finally(() => {
+                updateCreateButton();
+            });
+        }
+
+        findRouteBtn.addEventListener('click', computeRoute);
+        resetSelectionBtn.addEventListener('click', resetSelection);
+        createTicketBtn.addEventListener('click', purchaseTicket);
+
+        fromStopSelect.addEventListener('change', computeRoute);
+        toStopSelect.addEventListener('change', computeRoute);
 
         busSelect.addEventListener('change', () => {
             const bus = buses.find(item => String(item.bus_number) === busSelect.value);
@@ -1240,10 +928,10 @@
                 const capacityLabel = `${bus.current_passengers || 0}/${bus.capacity || 0} seats`;
                 busMeta.textContent = `Next arrival: ${bus.next_arrival || 'TBD'} • Driver: ${bus.driver_name || 'N/A'} • ${typeLabel} • ${capacityLabel}`;
             } else {
-                busMeta.textContent = 'Arrival time will show here.';
+                busMeta.textContent = 'Select a route to see buses.';
             }
-            updateSelectionUI();
             updateFareEstimate();
+            updateCreateButton();
         });
 
         function loadTickets() {
@@ -1256,23 +944,27 @@
         function renderTickets(tickets) {
             ticketsList.innerHTML = '';
             if (!tickets.length) {
-                ticketsList.innerHTML = '<div class="empty-state">No tickets yet. Select stops on the map to create one.</div>';
+                ticketsList.innerHTML = '<div class="empty-state">No tickets yet. Select stops to create one.</div>';
                 return;
             }
             tickets.forEach(ticket => {
                 const card = document.createElement('div');
                 card.className = 'ticket-item';
                 const route = ticket.path && ticket.path.length ? ticket.path.join(' → ') : `${ticket.from_stop} → ${ticket.to_stop}`;
+                const status = (ticket.status || 'open').toLowerCase();
+                const createdAt = ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'N/A';
                 card.innerHTML = `
-                    <h4>${ticket.ticket_id}</h4>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                        <h4>${ticket.ticket_id}</h4>
+                        <span class="ticket-status ${status}">${status}</span>
+                    </div>
                     <div class="ticket-meta">
                         <div><strong>From:</strong> ${ticket.from_stop || 'N/A'}</div>
                         <div><strong>To:</strong> ${ticket.to_stop || 'N/A'}</div>
                         <div><strong>Bus:</strong> ${ticket.bus_number || 'N/A'}</div>
                         <div><strong>Fare:</strong> Rs. ${ticket.fare !== undefined ? ticket.fare : 'N/A'}</div>
                         <div><strong>Arrival:</strong> ${ticket.eta || 'TBD'}</div>
-                        <div><strong>Status:</strong> ${ticket.status || 'open'}</div>
-                        <div><strong>Created:</strong> ${ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'N/A'}</div>
+                        <div><strong>Created:</strong> ${createdAt}</div>
                     </div>
                     <div class="ticket-path"><strong>Route:</strong> ${route}</div>
                 `;
@@ -1280,23 +972,7 @@
             });
         }
 
-        window.addEventListener('resize', () => {
-            if (stops.length) {
-                scheduleMapRender();
-            }
-        });
-
-        const mapObserver = new ResizeObserver(() => {
-            if (stops.length) {
-                scheduleMapRender();
-            }
-        });
-
-        mapObserver.observe(mapContainer);
-
-        fetchStops();
-        loadBuses();
-        loadTickets();
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
