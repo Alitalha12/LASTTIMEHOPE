@@ -27,6 +27,7 @@ config_file = os.path.join(data_dir, 'config.json')
 sim_file = os.path.join(data_dir, 'sim_distances.json')
 journeys_file = os.path.join(data_dir, 'journeys.json')
 favorites_file = os.path.join(data_dir, 'favorites.json')
+travel_history_file = os.path.join(data_dir, 'travel_history.json')
 
 
 # Ensure data directory exists
@@ -103,6 +104,131 @@ def _favorites_write(data):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(tmp, favorites_file)
+
+def _travel_history_init_file():
+    if not os.path.exists(travel_history_file):
+        os.makedirs(os.path.dirname(travel_history_file), exist_ok=True)
+        with open(travel_history_file, "w", encoding="utf-8") as f:
+            json.dump({"history": []}, f, indent=2)
+
+def _travel_history_read():
+    _travel_history_init_file()
+    return _read_json_file(travel_history_file, {"history": []})
+
+def _travel_history_write(data):
+    os.makedirs(os.path.dirname(travel_history_file), exist_ok=True)
+    tmp = travel_history_file + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, travel_history_file)
+
+def _travel_history_append(entry):
+    data = _travel_history_read()
+    history = data.get("history", [])
+    history.insert(0, entry)
+    data["history"] = history
+    _travel_history_write(data)
+
+def _parse_ticket_datetime(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+def _bus_lookup():
+    buses = _load_buses_raw()
+    return {
+        str(bus.get("bus_number")): bus
+        for bus in buses
+        if isinstance(bus, dict)
+    }
+
+def _normalize_ticket(ticket, bus_lookup):
+    ticket_id = ticket.get("ticket_id") or ticket.get("id")
+    from_stop = ticket.get("from_stop") or ticket.get("start_stop")
+    to_stop = ticket.get("to_stop") or ticket.get("end_stop")
+    bus_number = str(ticket.get("bus_number") or "").strip()
+    bus = bus_lookup.get(bus_number, {})
+    created_at = (
+        ticket.get("created_at")
+        or ticket.get("booking_time")
+        or ticket.get("travel_date")
+        or datetime.utcnow().isoformat()
+    )
+    path = ticket.get("path")
+    if not path and from_stop and to_stop:
+        path = [from_stop, to_stop]
+    distance = ticket.get("distance")
+    if distance is None and from_stop and to_stop:
+        route_planner.reload()
+        result = route_planner.shortest_path(from_stop, to_stop)
+        if result:
+            distance = result.get("distance")
+            if result.get("path"):
+                path = result["path"]
+    if distance is None:
+        distance = 0.0
+    return {
+        "ticket_id": ticket_id,
+        "passenger_id": ticket.get("passenger_id", ""),
+        "passenger_name": ticket.get("passenger_name", ""),
+        "from_stop": from_stop,
+        "to_stop": to_stop,
+        "path": path or [],
+        "status": ticket.get("status") or "open",
+        "fare": ticket.get("fare"),
+        "distance": distance,
+        "bus_number": bus_number,
+        "bus_type": ticket.get("bus_type") or bus.get("type"),
+        "route_id": ticket.get("route_id"),
+        "route_name": ticket.get("route_name"),
+        "eta": ticket.get("eta"),
+        "created_at": created_at,
+    }
+
+def _combine_passenger_tickets(passenger_id):
+    ticket_store._load()
+    bus_lookup = _bus_lookup()
+    seen = set()
+    combined = []
+
+    for ticket in ticket_store.list_for_passenger(passenger_id):
+        normalized = _normalize_ticket(ticket, bus_lookup)
+        key = normalized.get("ticket_id") or (normalized.get("from_stop"), normalized.get("to_stop"), normalized.get("created_at"))
+        if key not in seen:
+            combined.append(normalized)
+            seen.add(key)
+
+    for ticket in booking_system.get_passenger_tickets(passenger_id):
+        normalized = _normalize_ticket(ticket, bus_lookup)
+        key = normalized.get("ticket_id") or (normalized.get("from_stop"), normalized.get("to_stop"), normalized.get("created_at"))
+        if key not in seen:
+            combined.append(normalized)
+            seen.add(key)
+
+    history = _travel_history_read().get("history", [])
+    for ticket in history:
+        if ticket.get("passenger_id") != passenger_id:
+            continue
+        normalized = _normalize_ticket(ticket, bus_lookup)
+        key = normalized.get("ticket_id") or (normalized.get("from_stop"), normalized.get("to_stop"), normalized.get("created_at"))
+        if key not in seen:
+            combined.append(normalized)
+            seen.add(key)
+
+    combined.sort(
+        key=lambda item: _parse_ticket_datetime(item.get("created_at")) or datetime.min,
+        reverse=True,
+    )
+    return combined
 
 def _journey_total_distance(segments):
     return sum(float(segment.get("distance") or 0) for segment in segments)
@@ -559,7 +685,11 @@ class BusManager:
             if os.path.exists(self.data_file):
                 with open(self.data_file, 'r') as f:
                     buses = json.load(f)
+                    if isinstance(buses, dict):
+                        buses = buses.get("buses", [])
                     for bus in buses:
+                        if not isinstance(bus, dict):
+                            continue
                         self.bus_list.add_bus(bus)
                         self.min_heap_arrival.push(bus)
                         self.max_heap_priority.push(bus)
@@ -1340,8 +1470,7 @@ def passenger_travel_history():
         return redirect(url_for('admin_dashboard'))
 
     passenger_id = session.get('user_id', '')
-    history = _travel_history_read().get("history", [])
-    passenger_history = [h for h in history if h.get("passenger_id") == passenger_id]
+    passenger_history = _combine_passenger_tickets(passenger_id)
     return render_template('passenger_travel_history.html', user=session, history=passenger_history)
 
 
@@ -2054,7 +2183,7 @@ def passenger_my_tickets():
         return redirect(url_for('admin_dashboard'))
     
     passenger_id = session.get('user_id', '')
-    tickets = ticket_store.list_for_passenger(passenger_id)
+    tickets = _combine_passenger_tickets(passenger_id)
 
     return render_template(
         'passenger_my_tickets.html',
@@ -2303,7 +2432,7 @@ def passenger_tickets_api():
 
     passenger_id = session.get('user_id', '')
     if request.method == 'GET':
-        tickets = ticket_store.list_for_passenger(passenger_id)
+        tickets = _combine_passenger_tickets(passenger_id)
         return jsonify({'tickets': tickets})
 
     payload = request.get_json(force=True, silent=True) or {}
@@ -2345,6 +2474,7 @@ def passenger_tickets_api():
         distance=distance,
         eta=eta,
     )
+    _travel_history_append(ticket)
     _update_bus_passengers(bus_number, 1)
     return jsonify({'ticket': ticket}), 201
 
@@ -2510,7 +2640,9 @@ def book_ticket_api():
         
         # Book ticket
         result = booking_system.book_ticket(data)
-        
+        if result.get('success') and result.get('ticket'):
+            _travel_history_append(result['ticket'])
+
         return jsonify(result)
         
     except Exception as e:
@@ -2680,12 +2812,12 @@ def get_passenger_stats_api():
     
     try:
         passenger_id = session.get('user_id', '')
-        tickets = booking_system.get_passenger_tickets(passenger_id)
-        
+        tickets = _combine_passenger_tickets(passenger_id)
+
         stats = {
             'total_tickets': len(tickets),
-            'active_tickets': len([t for t in tickets if t.get('status') == 'confirmed']),
-            'total_spent': sum(t.get('fare', 0) for t in tickets if t.get('status') == 'confirmed'),
+            'active_tickets': len([t for t in tickets if t.get('status') != 'cancelled']),
+            'total_spent': sum(t.get('fare', 0) for t in tickets if t.get('status') != 'cancelled'),
             'favorite_route': '',
             'last_ticket': tickets[0] if tickets else None
         }
