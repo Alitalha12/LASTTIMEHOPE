@@ -331,6 +331,10 @@
         .bus-marker {
             animation: pulse 2s infinite;
         }
+
+        .bus-marker-group.active .bus-marker {
+            fill: #f59e0b;
+        }
         
         @keyframes pulse {
             0% { r: 6; opacity: 1; }
@@ -508,6 +512,11 @@
         let simulation = null;
         let selectedBus = null;
         let autoRefresh = true;
+        let liveBusesData = [];
+        let graphNodes = [];
+        let graphLinks = [];
+        let graphNodePositions = new Map();
+        let graphSvg = null;
         
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -547,8 +556,11 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        renderLiveBuses(data.live_buses);
-                        updateStats(data.live_buses);
+                        liveBusesData = data.live_buses || [];
+                        updateRouteFilterOptions(liveBusesData);
+                        applyFilters();
+                        updateStats(liveBusesData);
+                        updateBusMarkers(liveBusesData);
                         showLoading(false);
                     }
                 })
@@ -657,13 +669,49 @@
         }
         
         function filterBuses() {
+            applyFilters();
+        }
+
+        function applyFilters() {
             const routeFilter = document.getElementById('routeFilter').value;
             const speedFilter = document.getElementById('speedFilter').value;
-            
-            // In a real app, this would filter the data and re-render
-            console.log('Filtering by:', routeFilter, speedFilter);
+            const filtered = liveBusesData.filter(bus => {
+                const matchesRoute = routeFilter === 'all' || (bus.route_name || '') === routeFilter;
+                if (!matchesRoute) {
+                    return false;
+                }
+                const speed = bus.speed_kph ?? bus.speed ?? 0;
+                if (speedFilter === 'slow') {
+                    return speed <= 30;
+                }
+                if (speedFilter === 'medium') {
+                    return speed > 30 && speed <= 50;
+                }
+                if (speedFilter === 'fast') {
+                    return speed > 50;
+                }
+                return true;
+            });
+            renderLiveBuses(filtered);
+            updateBusMarkers(filtered);
         }
-        
+
+        function updateRouteFilterOptions(buses) {
+            const routeFilter = document.getElementById('routeFilter');
+            const current = routeFilter.value;
+            const routes = Array.from(new Set(buses.map(bus => bus.route_name).filter(Boolean)));
+            routeFilter.innerHTML = '<option value="all">All Routes</option>';
+            routes.forEach(route => {
+                const option = document.createElement('option');
+                option.value = route;
+                option.textContent = route;
+                routeFilter.appendChild(option);
+            });
+            if (routes.includes(current)) {
+                routeFilter.value = current;
+            }
+        }
+
         function selectBusForTracking(busNumber) {
             // Remove active class from all buses
             document.querySelectorAll('.bus-card').forEach(card => {
@@ -683,45 +731,38 @@
         }
         
         function loadGraphData() {
-            // In a real implementation, this would load actual graph data
-            // For now, create a sample graph
-            
-            const sampleNodes = [
-                { id: 'GARHI SHAHU', group: 1, x: 100, y: 200 },
-                { id: 'LIBERTY', group: 1, x: 300, y: 150 },
-                { id: 'BAHRIA TOWN', group: 2, x: 500, y: 100 },
-                { id: 'DHA', group: 2, x: 400, y: 300 },
-                { id: 'MODEL TOWN', group: 3, x: 200, y: 400 },
-                { id: 'JOHAR TOWN', group: 3, x: 600, y: 350 },
-                { id: 'WAPDA TOWN', group: 4, x: 700, y: 200 },
-                { id: 'FAISAL TOWN', group: 4, x: 350, y: 450 }
-            ];
-            
-            const sampleLinks = [
-                { source: 'GARHI SHAHU', target: 'LIBERTY', value: 5 },
-                { source: 'LIBERTY', target: 'BAHRIA TOWN', value: 8 },
-                { source: 'BAHRIA TOWN', target: 'DHA', value: 4 },
-                { source: 'DHA', target: 'MODEL TOWN', value: 6 },
-                { source: 'MODEL TOWN', target: 'JOHAR TOWN', value: 7 },
-                { source: 'JOHAR TOWN', target: 'WAPDA TOWN', value: 5 },
-                { source: 'WAPDA TOWN', target: 'FAISAL TOWN', value: 9 },
-                { source: 'FAISAL TOWN', target: 'GARHI SHAHU', value: 6 }
-            ];
-            
-            renderGraph(sampleNodes, sampleLinks);
+            fetch('/api/passenger/graph')
+                .then(response => response.json())
+                .then(data => {
+                    const stops = data.stops || [];
+                    const edges = data.edges || [];
+                    graphNodes = stops.map((stop, index) => ({
+                        id: stop.name,
+                        group: (index % 4) + 1
+                    }));
+                    graphLinks = edges.map(edge => ({
+                        source: edge.from,
+                        target: edge.to,
+                        value: edge.weight || 1
+                    }));
+                    renderGraph(graphNodes, graphLinks);
+                })
+                .catch(error => {
+                    console.error('Error loading graph data:', error);
+                });
         }
         
         function renderGraph(nodes, links) {
             const width = document.getElementById('transportGraph').clientWidth;
             const height = 500;
             
-            // Clear previous graph
             d3.select('#transportGraph').selectAll('*').remove();
             
             const svg = d3.select('#transportGraph')
                 .append('svg')
                 .attr('width', width)
                 .attr('height', height);
+            graphSvg = svg;
             
             // Add links
             const link = svg.append('g')
@@ -782,6 +823,9 @@
                 label
                     .attr('x', d => d.x)
                     .attr('y', d => d.y);
+
+                graphNodePositions = new Map(nodes.map(item => [item.id, { x: item.x, y: item.y }]));
+                updateBusMarkers(liveBusesData);
             }
             
             function dragstarted(event, d) {
@@ -801,45 +845,72 @@
                 d.fy = null;
             }
             
-            // Add bus markers (simulated)
-            addBusMarkers();
         }
         
-        function addBusMarkers() {
-            const svg = d3.select('#transportGraph svg');
-            
-            // Add some animated bus markers
-            const busPositions = [
-                { x: 150, y: 180, bus: 'Bus 1' },
-                { x: 350, y: 120, bus: 'Bus 2' },
-                { x: 450, y: 280, bus: 'Bus 3' },
-                { x: 650, y: 180, bus: 'Bus 4' }
-            ];
-            
-            busPositions.forEach(pos => {
-                svg.append('circle')
-                    .attr('class', 'bus-marker')
-                    .attr('cx', pos.x)
-                    .attr('cy', pos.y)
-                    .attr('r', 6)
-                    .attr('fill', '#1e40af')
-                    .attr('stroke', 'white')
-                    .attr('stroke-width', 2);
-                
-                svg.append('text')
-                    .attr('x', pos.x)
-                    .attr('y', pos.y - 15)
-                    .text(pos.bus)
-                    .attr('text-anchor', 'middle')
-                    .style('font-size', '10px')
-                    .style('font-weight', 'bold')
-                    .style('fill', '#1e40af');
-            });
+        function updateBusMarkers(buses) {
+            if (!graphSvg) {
+                return;
+            }
+            const markerGroup = graphSvg.selectAll('g.bus-markers')
+                .data([null])
+                .join('g')
+                .attr('class', 'bus-markers');
+
+            const markers = markerGroup.selectAll('g.bus-marker-group')
+                .data(buses, d => d.bus_number);
+
+            const markersEnter = markers.enter()
+                .append('g')
+                .attr('class', 'bus-marker-group');
+
+            markersEnter.append('circle')
+                .attr('class', 'bus-marker')
+                .attr('r', 6)
+                .attr('fill', '#1e40af')
+                .attr('stroke', 'white')
+                .attr('stroke-width', 2);
+
+            markersEnter.append('text')
+                .attr('class', 'bus-marker-label')
+                .attr('text-anchor', 'middle')
+                .attr('dy', -12)
+                .style('font-size', '10px')
+                .style('font-weight', 'bold')
+                .style('fill', '#1e40af')
+                .text(d => `Bus ${d.bus_number}`);
+
+            markers.merge(markersEnter)
+                .attr('data-bus', d => d.bus_number)
+                .attr('opacity', d => getBusPosition(d) ? 1 : 0);
+
+            markers.exit().remove();
+
+            markerGroup.selectAll('g.bus-marker-group')
+                .attr('transform', d => {
+                    const position = getBusPosition(d);
+                    if (!position) {
+                        return 'translate(-999,-999)';
+                    }
+                    return `translate(${position.x}, ${position.y})`;
+                })
+                .classed('active', d => String(d.bus_number) === String(selectedBus));
+        }
+
+        function getBusPosition(bus) {
+            const current = graphNodePositions.get(bus.current_stop);
+            const next = graphNodePositions.get(bus.next_stop);
+            if (!current || !next) {
+                return null;
+            }
+            const progress = bus.segment_progress ?? 0;
+            return {
+                x: current.x + (next.x - current.x) * progress,
+                y: current.y + (next.y - current.y) * progress
+            };
         }
         
         function highlightBusOnGraph(busNumber) {
-            // In a real implementation, this would highlight the bus on the graph
-            console.log('Highlighting bus:', busNumber);
+            updateBusMarkers(liveBusesData);
             
             // Show algorithm visualization
             visualizeShortestPath();
