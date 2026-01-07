@@ -277,6 +277,25 @@ def _load_buses_raw():
         return data.get("buses", [])
     return data
 
+def _load_routes_list():
+    routes_data = _load_routes_raw()
+    routes = routes_data.get("routes", [])
+    return routes if isinstance(routes, list) else []
+
+def _find_route_for_bus(bus, routes):
+    route_id = str(bus.get("route_id") or "").strip()
+    route_name = str(bus.get("route_name") or "").strip().lower()
+    for route in routes:
+        if not isinstance(route, dict):
+            continue
+        if route_id and str(route.get("route_id") or "").strip() == route_id:
+            return route
+    if route_name:
+        for route in routes:
+            if str(route.get("route_name") or "").strip().lower() == route_name:
+                return route
+    return None
+
 def _bus_route_counts(buses):
     counts = {}
     name_counts = {}
@@ -2586,11 +2605,11 @@ def passenger_live_tracking():
         flash('Passenger access only!', 'error')
         return redirect(url_for('admin_dashboard'))
     
-    # Get active buses
-    active_buses = []
-    if 'buses' in booking_system.buses:
-        active_buses = [bus for bus in booking_system.buses['buses'] 
-                       if bus.get('status') == 'active']
+    buses = _load_buses_raw()
+    active_buses = [
+        bus for bus in buses
+        if isinstance(bus, dict) and bus.get('status') == 'active'
+    ]
     
     return render_template('passenger_live_tracking.html',
                          user=session,
@@ -2693,107 +2712,117 @@ def get_live_buses_api():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
-        # Simulated live bus positions
         live_buses = []
-        
-        if 'buses' in booking_system.buses:
-            for bus in booking_system.buses['buses']:
-                if bus.get('status') == 'active':
-                    stops = []
-                    route_name = bus.get('route_name', '')
-                    route_id = bus.get('route_id', '')
+        buses = _load_buses_raw()
+        routes = _load_routes_list()
 
-                    # Get stops for this route
-                    for route in booking_system.routes.get('routes', []):
-                        if route_id and route.get('route_id') == route_id:
-                            stops = route.get('stops', [])
-                            route_name = route.get('route_name', route_name)
-                            break
-                        if route.get('route_name', '').lower() == route_name.lower():
-                            stops = route.get('stops', [])
-                            break
+        for bus in buses:
+            if not isinstance(bus, dict) or bus.get('status') != 'active':
+                continue
 
-                    if stops and len(stops) > 1:
-                        stop_names = [s.get('stop_name', '') for s in stops]
-                        segment_distances = [
-                            float(stops[index].get('distance_from_previous') or 0)
-                            for index in range(1, len(stops))
-                        ]
-                        speed_kph = float(bus.get('speed_kph') or 0)
-                        segment_duration_minutes = float(bus.get('segment_duration_minutes') or 0)
-                        if speed_kph <= 0 and segment_duration_minutes <= 0:
-                            speed_kph = 30.0
+            route = _find_route_for_bus(bus, routes) or {}
+            stops = route.get('stops', [])
+            route_name = route.get('route_name') or bus.get('route_name', 'Route')
+            stop_names = [s.get('stop_name', '') for s in stops if s.get('stop_name')]
 
-                        segment_durations = []
-                        for distance in segment_distances:
-                            if segment_duration_minutes > 0:
-                                duration = segment_duration_minutes
-                            else:
-                                duration = (distance / speed_kph) * 60 if distance > 0 else 1.0
-                            segment_durations.append(max(duration, 1.0))
+            speed_kph = float(bus.get('speed_kph') or 0)
+            segment_duration_minutes = float(bus.get('segment_duration_minutes') or 0)
+            if speed_kph <= 0 and segment_duration_minutes <= 0:
+                speed_kph = 30.0
 
-                        start_stop = bus.get('start_stop') or stop_names[0]
-                        start_stop_index = (
-                            stop_names.index(start_stop)
-                            if start_stop in stop_names
-                            else 0
-                        )
-                        if start_stop_index >= len(stop_names) - 1:
-                            start_stop_index = 0
-                        active_segment_durations = segment_durations[start_stop_index:]
-                        total_duration = sum(active_segment_durations) or 1.0
+            if len(stop_names) < 2:
+                live_buses.append({
+                    'bus_number': bus.get('bus_number'),
+                    'route_name': route_name or 'Route',
+                    'current_stop': stop_names[0] if stop_names else 'N/A',
+                    'next_stop': stop_names[1] if len(stop_names) > 1 else 'N/A',
+                    'segment_index': 0,
+                    'segment_progress': 0.0,
+                    'total_segments': max(len(stop_names) - 1, 1),
+                    'passenger_count': bus.get('current_passengers', 0),
+                    'capacity': bus.get('capacity', 50),
+                    'status': bus.get('status', 'active'),
+                    'speed': int(round(speed_kph)),
+                    'speed_kph': int(round(speed_kph)),
+                    'eta': 'TBD'
+                })
+                continue
 
-                        start_time_str = bus.get('start_time')
-                        now = datetime.now()
-                        if start_time_str:
-                            try:
-                                start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                                start_dt = datetime.combine(now.date(), start_time)
-                                if start_dt > now:
-                                    start_dt = start_dt - timedelta(days=1)
-                            except ValueError:
-                                start_dt = now
-                        else:
-                            start_dt = now
+            segment_distances = [
+                float(stops[index].get('distance_from_previous') or 0)
+                for index in range(1, len(stops))
+            ]
 
-                        elapsed_minutes = max((now - start_dt).total_seconds() / 60, 0.0)
-                        elapsed_cycle = elapsed_minutes % total_duration
+            segment_durations = []
+            for distance in segment_distances:
+                if segment_duration_minutes > 0:
+                    duration = segment_duration_minutes
+                else:
+                    duration = (distance / speed_kph) * 60 if distance > 0 else 1.0
+                segment_durations.append(max(duration, 1.0))
 
-                        segment_index = start_stop_index
-                        segment_elapsed = 0.0
-                        for duration in active_segment_durations:
-                            if elapsed_cycle <= duration:
-                                segment_elapsed = elapsed_cycle
-                                break
-                            elapsed_cycle -= duration
-                            segment_index += 1
+            start_stop = bus.get('start_stop') or stop_names[0]
+            start_stop_index = (
+                stop_names.index(start_stop)
+                if start_stop in stop_names
+                else 0
+            )
+            if start_stop_index >= len(stop_names) - 1:
+                start_stop_index = 0
+            active_segment_durations = segment_durations[start_stop_index:]
+            total_duration = sum(active_segment_durations) or 1.0
 
-                        if segment_index >= len(segment_durations):
-                            segment_index = len(segment_durations) - 1
-                            segment_elapsed = segment_durations[segment_index]
+            start_time_str = bus.get('start_time')
+            now = datetime.now()
+            if start_time_str:
+                try:
+                    start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                    start_dt = datetime.combine(now.date(), start_time)
+                    if start_dt > now:
+                        start_dt = start_dt - timedelta(days=1)
+                except ValueError:
+                    start_dt = now
+            else:
+                start_dt = now
 
-                        segment_duration = segment_durations[segment_index] or 1.0
-                        segment_progress = min(segment_elapsed / segment_duration, 1.0)
-                        segment_index_relative = max(segment_index - start_stop_index, 0)
-                        current_stop = stop_names[segment_index]
-                        next_stop = stop_names[segment_index + 1]
-                        eta_minutes = max(int(round((1 - segment_progress) * segment_duration)), 1)
+            elapsed_minutes = max((now - start_dt).total_seconds() / 60, 0.0)
+            elapsed_cycle = elapsed_minutes % total_duration
 
-                        live_buses.append({
-                            'bus_number': bus['bus_number'],
-                            'route_name': route_name,
-                            'current_stop': current_stop,
-                            'next_stop': next_stop,
-                            'segment_index': segment_index_relative,
-                            'segment_progress': round(segment_progress, 3),
-                            'total_segments': len(active_segment_durations),
-                            'passenger_count': bus.get('current_passengers', 0),
-                            'capacity': bus.get('capacity', 50),
-                            'status': 'moving',
-                            'speed': int(round(speed_kph)),
-                            'speed_kph': int(round(speed_kph)),
-                            'eta': f"{eta_minutes} minutes"
-                        })
+            segment_index = start_stop_index
+            segment_elapsed = 0.0
+            for duration in active_segment_durations:
+                if elapsed_cycle <= duration:
+                    segment_elapsed = elapsed_cycle
+                    break
+                elapsed_cycle -= duration
+                segment_index += 1
+
+            if segment_index >= len(segment_durations):
+                segment_index = len(segment_durations) - 1
+                segment_elapsed = segment_durations[segment_index]
+
+            segment_duration = segment_durations[segment_index] or 1.0
+            segment_progress = min(segment_elapsed / segment_duration, 1.0)
+            segment_index_relative = max(segment_index - start_stop_index, 0)
+            current_stop = stop_names[segment_index]
+            next_stop = stop_names[segment_index + 1]
+            eta_minutes = max(int(round((1 - segment_progress) * segment_duration)), 1)
+
+            live_buses.append({
+                'bus_number': bus.get('bus_number'),
+                'route_name': route_name,
+                'current_stop': current_stop,
+                'next_stop': next_stop,
+                'segment_index': segment_index_relative,
+                'segment_progress': round(segment_progress, 3),
+                'total_segments': len(active_segment_durations),
+                'passenger_count': bus.get('current_passengers', 0),
+                'capacity': bus.get('capacity', 50),
+                'status': 'moving',
+                'speed': int(round(speed_kph)),
+                'speed_kph': int(round(speed_kph)),
+                'eta': f"{eta_minutes} minutes"
+            })
         
         return jsonify({
             'success': True,
