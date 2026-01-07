@@ -1,0 +1,30 @@
+{
+  "journeys": [
+    {
+      "journey_id": "27b39268-ec02-437e-89f1-3ad02eb8c1a7",
+      "passenger_id": "ffc61ca5-c82f-4ad2-b561-b5b069762b97",
+      "start_stop": "GARHI SHAHU",
+      "end_stop": "liberty",
+      "bus_number": "1",
+      "bus_type": "air_conditioned",
+      "speed_kph": 40.0,
+      "path": [
+        "GARHI SHAHU",
+        "liberty"
+      ],
+      "segments": [
+        {
+          "from": "GARHI SHAHU",
+          "to": "liberty",
+          "distance": 90.0
+        }
+      ],
+      "distance": 90.0,
+      "status": "in_transit",
+      "start_time": "2026-01-07T03:17:03.519503",
+      "last_updated": "2026-01-07T03:19:12.567968",
+      "distance_covered": 1.43,
+      "remaining_distance": 88.57
+    }
+  ]
+}

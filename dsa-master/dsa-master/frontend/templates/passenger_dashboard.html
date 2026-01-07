@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passenger Dashboard - Smart Transport Hub</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-width: 250px;
+            --header-height: 70px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fb;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+        }
+        
+        .sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+            box-shadow: 5px 0 20px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+        
+        .sidebar-header {
+            padding: 30px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .sidebar-header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+        
+        .nav-links {
+            padding: 20px 0;
+        }
+        
+        .nav-item {
+            padding: 15px 25px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: white;
+        }
+        
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border-left-color: white;
+        }
+        
+        .nav-item i {
+            width: 20px;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+        }
+        
+        .header {
+            height: var(--header-height);
+            background: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 99;
+        }
+        
+        .header-left h1 {
+            font-size: 1.8rem;
+            color: #0f766e;
+            font-weight: 700;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #0d9488, #0f766e);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        
+        .user-details h4 {
+            color: #1e293b;
+            font-size: 1rem;
+            margin-bottom: 3px;
+        }
+        
+        .user-details p {
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+        
+        .logout-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logout-btn:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.2);
+        }
+        
+        .content-area {
+            padding: 30px;
+        }
+        
+        .dashboard-welcome {
+            background: linear-gradient(135deg, #0d9488, #0f766e);
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(13, 148, 136, 0.3);
+        }
+        
+        .dashboard-welcome h2 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            font-weight: 800;
+        }
+        
+        .dashboard-welcome p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .tracking-card {
+            background: white;
+            padding: 30px;
+            border-radius: 18px;
+            box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+            margin-bottom: 40px;
+        }
+
+        .tracking-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+            gap: 24px;
+        }
+
+        .tracking-map {
+            position: relative;
+            height: 360px;
+            border-radius: 16px;
+            background: radial-gradient(circle at top, #f8fafc 0%, #e2e8f0 50%, #cbd5f5 100%);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .tracking-map::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(0deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+            background-size: 30px 30px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .tracking-map svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .tracking-edge {
+            stroke: #94a3b8;
+            stroke-width: 2;
+            opacity: 0.7;
+        }
+
+        .tracking-edge.active {
+            stroke: #2563eb;
+            stroke-width: 3.5;
+            stroke-dasharray: 10 8;
+            animation: trackingDash 1.5s linear infinite;
+            opacity: 1;
+        }
+
+        @keyframes trackingDash {
+            to {
+                stroke-dashoffset: -18;
+            }
+        }
+
+        .tracking-marker {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #334155;
+            border: 3px solid #fff;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+        }
+
+        .tracking-marker.start {
+            background: #ef4444;
+        }
+
+        .tracking-marker.end {
+            background: #22c55e;
+        }
+
+        .tracking-marker span {
+            position: absolute;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            color: #1e293b;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .bus-dot {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #f59e0b;
+            border: 4px solid #fff;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        .tracking-controls {
+            display: grid;
+            gap: 12px;
+        }
+
+        .tracking-controls select,
+        .tracking-controls button {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #cbd5f5;
+            font-size: 0.95rem;
+        }
+
+        .tracking-controls button {
+            background: #0d9488;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+
+        .tracking-controls button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .tracking-status {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 10px;
+            color: #475569;
+            font-size: 0.9rem;
+        }
+
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.12);
+            color: #2563eb;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .tracking-stats {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border-top: 5px solid #0d9488;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(13, 148, 136, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #0d9488;
+        }
+        
+        .stat-info h3 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: #1e293b;
+        }
+        
+        .stat-info p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+        
+        .section-title {
+            font-size: 1.8rem;
+            color: #1e293b;
+            margin-bottom: 25px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .section-title i {
+            color: #0d9488;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border-left: 5px solid #0d9488;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #0d9488, #0f766e);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .feature-card p {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .feature-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #0d9488;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .feature-btn:hover {
+            background: #0f766e;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(13, 148, 136, 0.2);
+        }
+        
+        .quick-actions {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            margin-bottom: 40px;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #64748b;
+            text-decoration: none;
+            display: block;
+        }
+        
+        .action-btn:hover {
+            background: #f1f5f9;
+            border-color: #0d9488;
+            color: #0d9488;
+            transform: translateY(-5px);
+        }
+        
+        .action-btn i {
+            font-size: 2rem;
+            margin-bottom: 15px;
+        }
+        
+        .action-btn span {
+            display: block;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .recent-activity {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 50px;
+            height: 50px;
+            background: #f8fafc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0d9488;
+            font-size: 1.2rem;
+        }
+        
+        .activity-content h4 {
+            color: #1e293b;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .activity-content p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        .activity-time {
+            margin-left: auto;
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 70px;
+            }
+            
+            .sidebar-header h2,
+            .sidebar-header p,
+            .nav-item span {
+                display: none;
+            }
+            
+            .nav-item {
+                justify-content: center;
+                padding: 20px;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 0 20px;
+            }
+            
+            .content-area {
+                padding: 20px;
+            }
+            
+            .dashboard-welcome h2 {
+                font-size: 2rem;
+            }
+            
+            .stats-grid,
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .user-details {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 60px;
+            }
+            
+            .main-content {
+                margin-left: 60px;
+            }
+            
+            .dashboard-welcome {
+                padding: 25px;
+            }
+            
+            .stat-card,
+            .feature-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Welcome!</h2>
+            <p>{{ user.full_name }}</p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="#" class="nav-item active" id="dashboardNav">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('passenger_my_tickets') }}" class="nav-item" id="ticketsNav">
+                <i class="fas fa-ticket-alt"></i>
+                <span>My Tickets</span>
+            </a>
+            <a href="{{ url_for('passenger_plan_journey') }}" class="nav-item" id="findRouteNav">
+                <i class="fas fa-route"></i>
+                <span>Find Route</span>
+            </a>
+            <a href="{{ url_for('passenger_live_tracking') }}" class="nav-item" id="liveTrackingNav">
+                <i class="fas fa-bus"></i>
+                <span>Live Tracking</span>
+            </a>
+            <a href="{{ url_for('passenger_travel_history') }}" class="nav-item" id="historyNav">
+                <i class="fas fa-history"></i>
+                <span>Travel History</span>
+            </a>
+            <a href="{{ url_for('passenger_profile_page') }}" class="nav-item" id="profileNav">
+                <i class="fas fa-user-cog"></i>
+                <span>Profile</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="nav-item" id="logoutNav">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>Passenger Dashboard</h1>
+            </div>
+            
+            <div class="header-right">
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">
+                        {{ user.full_name[0] if user.full_name else 'U' }}
+                    </div>
+                    <div class="user-details">
+                        <h4 id="userName">{{ user.full_name }}</h4>
+                        <p>Passenger</p>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logoutButton">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
+        </div>
+        
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Welcome Section -->
+            <div class="dashboard-welcome">
+                <h2 id="welcomeMessage">Welcome, {{ user.full_name }}!</h2>
+                <p>Manage your travel, book tickets, and explore routes with our intelligent transport system.</p>
+            </div>
+            
+            <!-- Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-ticket-alt"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="ticketCount">0</h3>
+                        <p>Active Tickets</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-route"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="routeCount">0</h3>
+                        <p>Routes Taken</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="recentTrips">0</h3>
+                        <p>Recent Trips</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tracking-card">
+                <h2 class="section-title">
+                    <i class="fas fa-map-marked-alt"></i> Live Journey Tracking
+                </h2>
+                <div class="tracking-grid">
+                    <div class="tracking-map" id="trackingMap">
+                        <svg id="trackingLines"></svg>
+                        <div class="bus-dot" id="busDot" style="display: none;">🚌</div>
+                    </div>
+                    <div class="tracking-controls">
+                        <label>
+                            From Stop
+                            <select id="trackingStart">
+                                <option value="">Select start</option>
+                            </select>
+                        </label>
+                        <label>
+                            To Stop
+                            <select id="trackingEnd">
+                                <option value="">Select destination</option>
+                            </select>
+                        </label>
+                        <label>
+                            Bus
+                            <select id="trackingBus">
+                                <option value="">Select bus (optional)</option>
+                            </select>
+                        </label>
+                        <button id="startJourneyBtn" disabled>Start Journey</button>
+                        <div class="tracking-status">
+                            <span class="status-pill" id="journeyStatus">Idle</span>
+                            <span id="journeyRoute">Route: --</span>
+                        </div>
+                        <div class="tracking-stats">
+                            <div><strong>Remaining Distance:</strong> <span id="remainingDistance">-- km</span></div>
+                            <div><strong>Estimated Time:</strong> <span id="remainingTime">-- min</span></div>
+                            <div><strong>Current Segment:</strong> <span id="currentSegment">--</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Available Features -->
+            <h2 class="section-title">
+                <i class="fas fa-star"></i> Available Features
+            </h2>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h3>Find Route</h3>
+                    <p>Find the shortest and most efficient route between any two stops using our advanced graph algorithms.</p>
+                    <a href="#" class="feature-btn" id="findRouteBtn">Find Route</a>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-ticket-alt"></i>
+                    </div>
+                    <h3>Book Ticket</h3>
+                    <p>Book your bus tickets instantly with O(1) lookup time using our hash table technology.</p>
+                    <a href="#" class="feature-btn" id="bookTicketBtn">Book Now</a>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <h3>Live Tracking</h3>
+                    <p>Track your bus in real-time with accurate ETAs and live location updates.</p>
+                    <a href="#" class="feature-btn" id="trackBusBtn">Track Bus</a>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <h3>Travel History</h3>
+                    <p>View your complete travel history stored efficiently using tree data structures.</p>
+                    <a href="#" class="feature-btn" id="viewHistoryBtn">View History</a>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h2 class="section-title">
+                    <i class="fas fa-bolt"></i> Quick Actions
+                </h2>
+                
+                <div class="actions-grid">
+                    <a href="#" class="action-btn" id="planJourneyBtn">
+                        <i class="fas fa-search-location"></i>
+                        <span>Plan Journey</span>
+                    </a>
+                    
+                    <a href="#" class="action-btn" id="scanTicketBtn">
+                        <i class="fas fa-qrcode"></i>
+                        <span>Scan Ticket</span>
+                    </a>
+                    
+                    <a href="#" class="action-btn" id="notificationsBtn">
+                        <i class="fas fa-bell"></i>
+                        <span>Notifications</span>
+                    </a>
+                    
+                    <a href="#" class="action-btn" id="helpCenterBtn">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Help Center</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <h2 class="section-title">
+                    <i class="fas fa-heart"></i> Favorites & Recommendations
+                </h2>
+                <div class="actions-grid">
+                    <div class="action-btn" id="favoriteRouteCard">
+                        <i class="fas fa-route"></i>
+                        <span>Favorite Route</span>
+                        <small id="favoriteRouteText">Add your top route</small>
+                    </div>
+                    <div class="action-btn" id="popularRouteCard">
+                        <i class="fas fa-fire"></i>
+                        <span>Popular Today</span>
+                        <small id="popularRouteText">Loading...</small>
+                    </div>
+                </div>
+                <div class="actions-grid" style="margin-top: 20px;">
+                    <div class="action-btn" id="favoriteStopCard">
+                        <i class="fas fa-map-pin"></i>
+                        <span>Favorite Stop</span>
+                        <small id="favoriteStopText">Add your go-to stop</small>
+                    </div>
+                    <div class="action-btn" id="recentRouteCard">
+                        <i class="fas fa-redo"></i>
+                        <span>Book Again</span>
+                        <small id="bookAgainText">Pick a recent trip</small>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; display: grid; gap: 12px;">
+                    <div>
+                        <label for="favoriteRouteInput"><strong>Add Favorite Route</strong></label>
+                        <input id="favoriteRouteInput" type="text" placeholder="e.g. City Center → Campus" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1;">
+                        <button class="feature-btn" id="addFavoriteRouteBtn" style="margin-top:8px;">Save Route</button>
+                    </div>
+                    <div>
+                        <label for="favoriteStopInput"><strong>Add Favorite Stop</strong></label>
+                        <input id="favoriteStopInput" type="text" placeholder="e.g. Main Gate" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1;">
+                        <button class="feature-btn" id="addFavoriteStopBtn" style="margin-top:8px;">Save Stop</button>
+                    </div>
+                    <div id="favoriteList" style="display:grid; gap:8px;"></div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="recent-activity">
+                <h2 class="section-title">
+                    <i class="fas fa-clipboard-list"></i> Recent Activity
+                </h2>
+                
+                <div class="activity-list" id="activityList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Passenger Dashboard loaded');
+            
+            // Setup logout button
+            setupLogoutButton();
+            
+            // Setup navigation
+            setupNavigation();
+            
+            // Setup feature buttons
+            setupFeatureButtons();
+            
+            // Setup quick action buttons
+            setupQuickActions();
+            
+            // Load user data
+            loadUserData();
+
+            // Setup live tracking
+            setupLiveTracking();
+
+            // Load stats and activity
+            loadPassengerStats();
+            loadRecentActivity();
+            setupFavorites();
+        });
+        
+        // Setup logout button
+        function setupLogoutButton() {
+            const logoutButton = document.getElementById('logoutButton');
+            const logoutNav = document.getElementById('logoutNav');
+            
+            if (logoutButton) {
+                logoutButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    confirmLogout();
+                });
+            }
+            
+            if (logoutNav) {
+                logoutNav.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    confirmLogout();
+                });
+            }
+        }
+        
+        // Confirm logout
+        function confirmLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                // Add loading state to button
+                const logoutButton = document.getElementById('logoutButton');
+                if (logoutButton) {
+                    logoutButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging out...';
+                    logoutButton.disabled = true;
+                }
+                
+                // Redirect to logout
+                window.location.href = '{{ url_for("logout") }}';
+            }
+        }
+        
+        // Setup navigation
+        function setupNavigation() {
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    const href = this.getAttribute('href');
+                    
+                    // Don't prevent default for actual links
+                    if (href && href !== '#' && !href.includes('javascript:')) {
+                        return;
+                    }
+                    
+                    e.preventDefault();
+                    
+                    // Remove active class from all items
+                    navItems.forEach(navItem => {
+                        navItem.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked item
+                    this.classList.add('active');
+                    
+                    // Handle different navigation items
+                    const id = this.id;
+                    switch(id) {
+                        case 'dashboardNav':
+                            showDashboard();
+                            break;
+                        case 'ticketsNav':
+                            showMyTickets();
+                            break;
+                        case 'findRouteNav':
+                            showFindRoute();
+                            break;
+                        case 'liveTrackingNav':
+                            showLiveTracking();
+                            break;
+                        case 'historyNav':
+                            showTravelHistory();
+                            break;
+                        case 'profileNav':
+                            showProfile();
+                            break;
+                    }
+                });
+            });
+        }
+        
+        // Setup feature buttons
+        function setupFeatureButtons() {
+            // Find Route button
+            const findRouteBtn = document.getElementById('findRouteBtn');
+            if (findRouteBtn) {
+                findRouteBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showFindRoute();
+                });
+            }
+            
+            // Book Ticket button
+            const bookTicketBtn = document.getElementById('bookTicketBtn');
+            if (bookTicketBtn) {
+                bookTicketBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.location.href = '{{ url_for("passenger_book_ticket_page") }}';
+                });
+            }
+            
+            // Track Bus button
+            const trackBusBtn = document.getElementById('trackBusBtn');
+            if (trackBusBtn) {
+                trackBusBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showLiveTracking();
+                });
+            }
+            
+            // View History button
+            const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+            if (viewHistoryBtn) {
+                viewHistoryBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showTravelHistory();
+                });
+            }
+        }
+        
+        // Setup quick action buttons
+        function setupQuickActions() {
+            // Plan Journey
+            const planJourneyBtn = document.getElementById('planJourneyBtn');
+            if (planJourneyBtn) {
+                planJourneyBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.location.href = '{{ url_for("passenger_plan_journey") }}';
+                });
+            }
+            
+            // Scan Ticket
+            const scanTicketBtn = document.getElementById('scanTicketBtn');
+            if (scanTicketBtn) {
+                scanTicketBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    alert('Scan Ticket feature coming soon!');
+                });
+            }
+            
+            // Notifications
+            const notificationsBtn = document.getElementById('notificationsBtn');
+            if (notificationsBtn) {
+                notificationsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    alert('Notifications feature coming soon!');
+                });
+            }
+            
+            // Help Center
+            const helpCenterBtn = document.getElementById('helpCenterBtn');
+            if (helpCenterBtn) {
+                helpCenterBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    alert('Help Center feature coming soon!');
+                });
+            }
+        }
+        
+        // Load user data
+        function loadUserData() {
+            try {
+                // Update welcome message with current time
+                const now = new Date();
+                const hours = now.getHours();
+                let greeting = 'Welcome';
+                
+                if (hours < 12) {
+                    greeting = 'Good morning';
+                } else if (hours < 18) {
+                    greeting = 'Good afternoon';
+                } else {
+                    greeting = 'Good evening';
+                }
+                
+                const welcomeMessage = document.getElementById('welcomeMessage');
+                if (welcomeMessage) {
+                    welcomeMessage.textContent = `${greeting}, {{ user.full_name }}!`;
+                }
+                
+                // Update user avatar with first letter
+                const userAvatar = document.getElementById('userAvatar');
+                if (userAvatar && !userAvatar.textContent.trim()) {
+                    userAvatar.textContent = '{{ user.full_name[0] if user.full_name else "U" }}';
+                }
+                
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        }
+        
+        // Navigation functions (placeholder implementations)
+        function showDashboard() {
+            // Already on dashboard
+            console.log('Showing dashboard');
+        }
+        
+        function showMyTickets() {
+            window.location.href = '{{ url_for("passenger_my_tickets") }}';
+        }
+        
+        function showFindRoute() {
+            window.location.href = '{{ url_for("passenger_plan_journey") }}';
+        }
+        
+        function showLiveTracking() {
+            window.location.href = '{{ url_for("passenger_live_tracking") }}';
+        }
+        
+        function showTravelHistory() {
+            window.location.href = '{{ url_for("passenger_travel_history") }}';
+        }
+        
+        function showProfile() {
+            window.location.href = '{{ url_for("passenger_profile_page") }}';
+        }
+
+        // Live tracking setup
+        let trackingStops = [];
+        let trackingEdges = [];
+        let trackingPositions = new Map();
+        let journeyId = null;
+        let journeyPoller = null;
+        let activeSegments = [];
+        let lastEtaNotificationAt = null;
+
+        function setupLiveTracking() {
+            fetchTrackingGraph();
+            fetchTrackingBuses();
+            setupTrackingControls();
+        }
+
+        function setupTrackingControls() {
+            const startSelect = document.getElementById('trackingStart');
+            const endSelect = document.getElementById('trackingEnd');
+            const startBtn = document.getElementById('startJourneyBtn');
+
+            if (!startSelect || !endSelect || !startBtn) return;
+
+            const updateButtonState = () => {
+                startBtn.disabled = !(startSelect.value && endSelect.value);
+                updateTrackingMarkers();
+            };
+
+            startSelect.addEventListener('change', updateButtonState);
+            endSelect.addEventListener('change', updateButtonState);
+
+            startBtn.addEventListener('click', () => startJourney());
+        }
+
+        function fetchTrackingGraph() {
+            fetch('/api/passenger/graph')
+                .then(response => response.json())
+                .then(data => {
+                    trackingStops = data.stops || [];
+                    trackingEdges = data.edges || [];
+                    populateTrackingStops();
+                    renderTrackingMap();
+                })
+                .catch(() => {
+                    const map = document.getElementById('trackingMap');
+                    if (map) {
+                        map.innerHTML = '<p style="padding:20px;color:#64748b;">Unable to load tracking map.</p>';
+                    }
+                });
+        }
+
+        function fetchTrackingBuses() {
+            fetch('/api/passenger/buses')
+                .then(response => response.json())
+                .then(data => {
+                    const busSelect = document.getElementById('trackingBus');
+                    if (!busSelect) return;
+                    busSelect.innerHTML = '<option value="">Select bus (optional)</option>';
+                    (data.buses || []).forEach(bus => {
+                        const option = document.createElement('option');
+                        option.value = bus.bus_number;
+                        option.textContent = `Bus ${bus.bus_number} (${bus.route_name || 'Route'})`;
+                        busSelect.appendChild(option);
+                    });
+                });
+        }
+
+        function populateTrackingStops() {
+            const startSelect = document.getElementById('trackingStart');
+            const endSelect = document.getElementById('trackingEnd');
+            if (!startSelect || !endSelect) return;
+            startSelect.innerHTML = '<option value="">Select start</option>';
+            endSelect.innerHTML = '<option value="">Select destination</option>';
+            trackingStops.forEach(stop => {
+                const option = document.createElement('option');
+                option.value = stop.name;
+                option.textContent = stop.name;
+                startSelect.appendChild(option.cloneNode(true));
+                endSelect.appendChild(option);
+            });
+        }
+
+        function renderTrackingMap() {
+            const map = document.getElementById('trackingMap');
+            const svg = document.getElementById('trackingLines');
+            if (!map || !svg) return;
+
+            map.querySelectorAll('.tracking-marker').forEach(marker => marker.remove());
+            svg.innerHTML = '';
+            trackingPositions = new Map();
+
+            const rect = map.getBoundingClientRect();
+            const width = rect.width || 500;
+            const height = rect.height || 360;
+            const padding = 28;
+
+            trackingStops.forEach((stop, index) => {
+                const angle = (index / trackingStops.length) * Math.PI * 2;
+                const x = width / 2 + Math.cos(angle) * (width / 2 - padding);
+                const y = height / 2 + Math.sin(angle) * (height / 2 - padding);
+                trackingPositions.set(stop.name, { x, y });
+
+                const marker = document.createElement('div');
+                marker.className = 'tracking-marker';
+                marker.style.left = `${x}px`;
+                marker.style.top = `${y}px`;
+                marker.dataset.stop = stop.name;
+                const label = document.createElement('span');
+                label.textContent = stop.name;
+                marker.appendChild(label);
+                map.appendChild(marker);
+            });
+
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            trackingEdges.forEach(edge => {
+                const from = trackingPositions.get(edge.from);
+                const to = trackingPositions.get(edge.to);
+                if (!from || !to) return;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', from.x);
+                line.setAttribute('y1', from.y);
+                line.setAttribute('x2', to.x);
+                line.setAttribute('y2', to.y);
+                line.setAttribute('class', 'tracking-edge');
+                if (isActiveSegment(edge.from, edge.to)) {
+                    line.classList.add('active');
+                }
+                svg.appendChild(line);
+            });
+
+            updateTrackingMarkers();
+        }
+
+        function updateTrackingMarkers() {
+            const map = document.getElementById('trackingMap');
+            const startStop = document.getElementById('trackingStart')?.value;
+            const endStop = document.getElementById('trackingEnd')?.value;
+            if (!map) return;
+            map.querySelectorAll('.tracking-marker').forEach(marker => {
+                marker.classList.remove('start', 'end');
+                if (marker.dataset.stop === startStop) {
+                    marker.classList.add('start');
+                }
+                if (marker.dataset.stop === endStop) {
+                    marker.classList.add('end');
+                }
+            });
+        }
+
+        function isActiveSegment(from, to) {
+            return activeSegments.some(segment =>
+                (segment.from === from && segment.to === to) ||
+                (segment.from === to && segment.to === from)
+            );
+        }
+
+        function startJourney() {
+            const startStop = document.getElementById('trackingStart')?.value;
+            const endStop = document.getElementById('trackingEnd')?.value;
+            const busNumber = document.getElementById('trackingBus')?.value;
+            if (!startStop || !endStop) return;
+
+            fetch('/api/passenger/journey/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    start_stop: startStop,
+                    end_stop: endStop,
+                    bus_number: busNumber
+                })
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    throw new Error(data.error || 'Unable to start journey');
+                }
+                const journey = data.journey;
+                journeyId = journey.journey_id;
+                activeSegments = journey.segments || [];
+                document.getElementById('journeyRoute').textContent = `Route: ${journey.start_stop} → ${journey.end_stop}`;
+                document.getElementById('journeyStatus').textContent = 'In Transit';
+                updateTrackingMarkers();
+                renderTrackingMap();
+                startJourneyPolling();
+            })
+            .catch(error => {
+                document.getElementById('journeyStatus').textContent = error.message;
+            });
+        }
+
+        function startJourneyPolling() {
+            if (journeyPoller) {
+                clearInterval(journeyPoller);
+            }
+            fetchJourneyStatus();
+            journeyPoller = setInterval(fetchJourneyStatus, 3000);
+        }
+
+        function fetchJourneyStatus() {
+            if (!journeyId) return;
+            fetch(`/api/passenger/journey/status?journey_id=${journeyId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    updateJourneyUI(data);
+                })
+                .catch(error => {
+                    document.getElementById('journeyStatus').textContent = error.message;
+                });
+        }
+
+        function updateJourneyUI(data) {
+            const statusLabel = data.status === 'approaching_destination' ? 'Approaching Destination' : 'In Transit';
+            document.getElementById('journeyStatus').textContent = statusLabel;
+            document.getElementById('remainingDistance').textContent = `${data.remaining_distance.toFixed(2)} km`;
+            document.getElementById('remainingTime').textContent = `${Math.ceil(data.remaining_minutes)} min`;
+            const segment = data.position || {};
+            document.getElementById('currentSegment').textContent = segment.from && segment.to
+                ? `${segment.from} → ${segment.to}`
+                : '--';
+            moveBusDot(segment);
+
+            if (data.remaining_minutes <= 5 && statusLabel === 'In Transit') {
+                const now = Date.now();
+                if (!lastEtaNotificationAt || now - lastEtaNotificationAt > 120000) {
+                    showNotification('Your bus is arriving in less than 5 minutes!', 'success');
+                    lastEtaNotificationAt = now;
+                }
+            }
+        }
+
+        function moveBusDot(segment) {
+            const busDot = document.getElementById('busDot');
+            if (!busDot || !segment) return;
+            const from = trackingPositions.get(segment.from);
+            const to = trackingPositions.get(segment.to);
+            if (!from || !to) return;
+            const progress = segment.segment_progress || 0;
+            const x = from.x + (to.x - from.x) * progress;
+            const y = from.y + (to.y - from.y) * progress;
+            busDot.style.left = `${x}px`;
+            busDot.style.top = `${y}px`;
+            busDot.style.display = 'flex';
+        }
+
+        window.addEventListener('resize', () => {
+            if (trackingStops.length) {
+                renderTrackingMap();
+            }
+        });
+        
+        function showBookTicket() {
+            alert('Book Ticket feature coming soon!');
+        }
+
+        function loadPassengerStats() {
+            fetch('/api/passenger/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data || data.error) {
+                        throw new Error(data.error || 'Unable to load stats');
+                    }
+                    const stats = data.stats || {};
+                    const ticketCount = document.getElementById('ticketCount');
+                    if (ticketCount) {
+                        ticketCount.textContent = stats.active_tickets ?? stats.total_tickets ?? 0;
+                    }
+                    const recentTrips = document.getElementById('recentTrips');
+                    if (recentTrips) {
+                        recentTrips.textContent = stats.total_tickets ?? 0;
+                    }
+                    const favoriteRouteText = document.getElementById('favoriteRouteText');
+                    if (favoriteRouteText) {
+                        favoriteRouteText.textContent = stats.favorite_route || 'Add your top route';
+                    }
+                })
+                .catch(error => console.error('Stats error:', error));
+        }
+
+        function loadRecentActivity() {
+            const list = document.getElementById('activityList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const addItem = (title, detail, time, icon = 'info-circle', actions = '') => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                item.innerHTML = `
+                    <div class="activity-icon">
+                        <i class="fas fa-${icon}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <h4>${title}</h4>
+                        <p>${detail}</p>
+                        ${actions}
+                    </div>
+                    <div class="activity-time">${time}</div>
+                `;
+                list.appendChild(item);
+            };
+
+            const now = new Date();
+            addItem('Account Login', 'Successfully logged into your account', now.toLocaleTimeString(), 'user-check');
+
+            fetch('/api/passenger/tickets')
+                .then(response => response.json())
+                .then(data => {
+                    const tickets = data.tickets || [];
+                    if (!tickets.length) {
+                        addItem('No Trips Yet', 'Book your first ticket to see activity here.', 'Today', 'ticket-alt');
+                        return;
+                    }
+
+                    const sorted = [...tickets].sort((a, b) => {
+                        const aDate = new Date(a.created_at || 0);
+                        const bDate = new Date(b.created_at || 0);
+                        return bDate - aDate;
+                    });
+
+                    const recent = sorted.slice(0, 3);
+                    recent.forEach(ticket => {
+                        const routeLabel = `${ticket.from_stop} → ${ticket.to_stop}`;
+                        const created = ticket.created_at ? new Date(ticket.created_at) : now;
+                        const timeLabel = created.toLocaleDateString();
+                        const action = `
+                            <div style="margin-top:8px;">
+                                <a class="feature-btn" href="{{ url_for('passenger_book_ticket_page') }}?from=${encodeURIComponent(ticket.from_stop)}&to=${encodeURIComponent(ticket.to_stop)}">Book Again</a>
+                            </div>
+                        `;
+                        addItem('Trip Completed', routeLabel, timeLabel, 'route', action);
+                    });
+
+                    const routeNames = sorted.map(ticket => ticket.route_name).filter(Boolean);
+                    const popularRoute = routeNames.sort((a, b) =>
+                        routeNames.filter(name => name === b).length -
+                        routeNames.filter(name => name === a).length
+                    )[0];
+                    const popularRouteText = document.getElementById('popularRouteText');
+                    if (popularRouteText) {
+                        popularRouteText.textContent = popularRoute || 'Explore new routes';
+                    }
+                    const routeCount = document.getElementById('routeCount');
+                    if (routeCount) {
+                        const uniqueRoutes = new Set(routeNames);
+                        routeCount.textContent = uniqueRoutes.size;
+                    }
+                    const bookAgainText = document.getElementById('bookAgainText');
+                    if (bookAgainText && recent[0]) {
+                        bookAgainText.textContent = `${recent[0].from_stop} → ${recent[0].to_stop}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Activity error:', error);
+                    addItem('Unable to load trips', 'Please try again later.', 'Now', 'exclamation-circle');
+                });
+        }
+
+        function setupFavorites() {
+            const routeBtn = document.getElementById('addFavoriteRouteBtn');
+            const stopBtn = document.getElementById('addFavoriteStopBtn');
+            if (routeBtn) {
+                routeBtn.addEventListener('click', () => addFavorite('route'));
+            }
+            if (stopBtn) {
+                stopBtn.addEventListener('click', () => addFavorite('stop'));
+            }
+            loadFavorites();
+        }
+
+        function loadFavorites() {
+            fetch('/api/passenger/favorites')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    renderFavorites(data.favorites || {});
+                })
+                .catch(error => console.error('Favorites error:', error));
+        }
+
+        function renderFavorites(favorites) {
+            const list = document.getElementById('favoriteList');
+            if (!list) return;
+            list.innerHTML = '';
+            const routes = favorites.routes || [];
+            const stops = favorites.stops || [];
+
+            if (!routes.length && !stops.length) {
+                list.innerHTML = '<div style="color:#64748b;">No favorites yet. Add one above!</div>';
+                return;
+            }
+
+            const addChip = (label, type) => {
+                const chip = document.createElement('div');
+                chip.style.cssText = 'display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 12px;border-radius:999px;';
+                chip.innerHTML = `
+                    <span>${label}</span>
+                    <button data-type="${type}" data-value="${label}" style="border:none;background:#ef4444;color:#fff;border-radius:999px;padding:2px 8px;cursor:pointer;">×</button>
+                `;
+                list.appendChild(chip);
+            };
+
+            routes.forEach(route => addChip(route, 'route'));
+            stops.forEach(stop => addChip(stop, 'stop'));
+
+            list.querySelectorAll('button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const type = button.dataset.type;
+                    const value = button.dataset.value;
+                    updateFavorite(type, value, 'remove');
+                });
+            });
+
+            const favoriteRouteText = document.getElementById('favoriteRouteText');
+            if (favoriteRouteText) {
+                favoriteRouteText.textContent = routes[0] || 'Add your top route';
+            }
+            const favoriteStopText = document.getElementById('favoriteStopText');
+            if (favoriteStopText) {
+                favoriteStopText.textContent = stops[0] || 'Add your go-to stop';
+            }
+        }
+
+        function addFavorite(type) {
+            const input = document.getElementById(type === 'route' ? 'favoriteRouteInput' : 'favoriteStopInput');
+            if (!input) return;
+            const value = input.value.trim();
+            if (!value) return;
+            updateFavorite(type, value, 'add');
+            input.value = '';
+        }
+
+        function updateFavorite(type, value, action) {
+            fetch('/api/passenger/favorites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: `${action}_${type}`,
+                    value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                renderFavorites(data.favorites || {});
+            })
+            .catch(error => {
+                console.error('Favorite update error:', error);
+                showNotification('Unable to update favorites', 'error');
+            });
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+L for logout
+            if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                confirmLogout();
+            }
+            
+            // F1 for help
+            if (e.key === 'F1') {
+                e.preventDefault();
+                alert('Help: Press Ctrl+L to logout, F5 to refresh');
+            }
+        });
+        
+        // Show notification function
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // Add CSS animations for notifications
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Auto-refresh dashboard every minute
+        setInterval(() => {
+            console.log('Auto-refreshing dashboard...');
+            // You can add data refresh logic here
+        }, 60000);
+    </script>
+</body>
+</html>
