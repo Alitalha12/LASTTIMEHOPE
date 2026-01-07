@@ -168,37 +168,33 @@
                 return;
             }
             
-            // Simulate finding route (in real app, this would call API)
             const resultContainer = document.getElementById('resultContainer');
             const routeResult = document.getElementById('routeResult');
             
-            // Show loading
             routeResult.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Finding shortest path using Dijkstra\'s algorithm...</p>';
             resultContainer.style.display = 'block';
-            
-            // Simulate API call
-            setTimeout(() => {
-                const stops = ['{{ stops|join("', '") }}'].split(', ');
-                const fromIndex = stops.indexOf(fromStop);
-                const toIndex = stops.indexOf(toStop);
-                
-                if (fromIndex === -1 || toIndex === -1) {
-                    routeResult.innerHTML = '<p class="error">Invalid stops selected</p>';
-                    return;
+
+            fetch('/api/passenger/route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    start_stop: fromStop,
+                    end_stop: toStop
+                })
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    throw new Error(data.error || 'Unable to find a route');
                 }
-                
-                // Generate path
-                let path = [];
-                const direction = fromIndex < toIndex ? 1 : -1;
-                
-                for (let i = fromIndex; i !== toIndex + direction; i += direction) {
-                    path.push(stops[i]);
-                }
-                
-                // Calculate estimated time
-                const distance = Math.abs(toIndex - fromIndex);
-                const estimatedTime = distance * 10; // 10 minutes per stop
-                
+
+                const path = data.path || [];
+                const distance = data.distance ?? 0;
+                const routeName = data.route_name || 'Route';
+                const traffic = data.traffic || 'low';
+                const segments = data.segments || [];
+                const estimatedTime = Math.round(distance * 4);
+
                 routeResult.innerHTML = `
                     <div class="algorithm-info">
                         <h3><i class="fas fa-code"></i> Algorithm: Dijkstra's Shortest Path</h3>
@@ -212,12 +208,19 @@
                             ${index < path.length - 1 ? '<i class="fas fa-arrow-right"></i>' : ''}
                         </div>
                     `).join('')}
+
+                    <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 8px;">
+                        <h4><i class="fas fa-bus"></i> Route Details:</h4>
+                        <p><strong>Route:</strong> ${routeName}</p>
+                        <p><strong>Traffic:</strong> ${traffic}</p>
+                        <p><strong>Segments:</strong> ${segments.length}</p>
+                    </div>
                     
                     <div style="margin-top: 20px; padding: 15px; background: #d1fae5; border-radius: 8px;">
                         <h4><i class="fas fa-info-circle"></i> Route Summary:</h4>
                         <p><strong>Total Stops:</strong> ${path.length}</p>
                         <p><strong>Estimated Travel Time:</strong> ${estimatedTime} minutes</p>
-                        <p><strong>Distance:</strong> ${distance} stops</p>
+                        <p><strong>Distance:</strong> ${distance.toFixed(1)} km</p>
                     </div>
                     
                     <div style="margin-top: 20px;">
@@ -226,7 +229,10 @@
                         </button>
                     </div>
                 `;
-            }, 1500);
+            })
+            .catch(error => {
+                routeResult.innerHTML = `<p class="error">${error.message}</p>`;
+            });
         }
         
         function bookThisRoute(fromStop, toStop) {
