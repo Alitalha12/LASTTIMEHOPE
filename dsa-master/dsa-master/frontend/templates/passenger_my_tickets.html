@@ -507,6 +507,35 @@
             color: #0f766e;
         }
 
+        .ticket-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .ticket-status.confirmed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .ticket-status.open {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .ticket-status.cancelled {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
         .ticket-meta {
             font-size: 0.9rem;
             color: #475569;
@@ -1263,16 +1292,20 @@
                 const card = document.createElement('div');
                 card.className = 'ticket-item';
                 const route = ticket.path && ticket.path.length ? ticket.path.join(' → ') : `${ticket.from_stop} → ${ticket.to_stop}`;
+                const status = (ticket.status || 'open').toLowerCase();
+                const createdAt = ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'N/A';
                 card.innerHTML = `
-                    <h4>${ticket.ticket_id}</h4>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                        <h4>${ticket.ticket_id}</h4>
+                        <span class="ticket-status ${status}">${status}</span>
+                    </div>
                     <div class="ticket-meta">
                         <div><strong>From:</strong> ${ticket.from_stop || 'N/A'}</div>
                         <div><strong>To:</strong> ${ticket.to_stop || 'N/A'}</div>
                         <div><strong>Bus:</strong> ${ticket.bus_number || 'N/A'}</div>
                         <div><strong>Fare:</strong> Rs. ${ticket.fare !== undefined ? ticket.fare : 'N/A'}</div>
                         <div><strong>Arrival:</strong> ${ticket.eta || 'TBD'}</div>
-                        <div><strong>Status:</strong> ${ticket.status || 'open'}</div>
-                        <div><strong>Created:</strong> ${ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'N/A'}</div>
+                        <div><strong>Created:</strong> ${createdAt}</div>
                     </div>
                     <div class="ticket-path"><strong>Route:</strong> ${route}</div>
                 `;
