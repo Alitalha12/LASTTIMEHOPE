@@ -72,7 +72,9 @@ JSON format should be exactly:
       throw new Error("Invalid model response: JSON block missing");
     }
 
-    const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
+    let jsonString = responseText.substring(jsonStart, jsonEnd + 1);
+    // Sanitize unescaped control characters (like raw newlines and tabs) to prevent JSON.parse failures
+    jsonString = jsonString.replace(/[\r\n\t]+/g, " ");
     const parsedVerdict = JSON.parse(jsonString);
 
     // Validate percentages sum up to 100
